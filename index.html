@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Income App | Premium Rewards</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-main: #050a14;
+            --bg-card: rgba(20, 30, 48, 0.6);
+            --accent: #00e676;
+            --accent-2: #00b0ff;
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-main);
+            color: #fff;
+            overflow-x: hidden;
+        }
+        .glass {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-accent {
+            box-shadow: 0 0 20px rgba(0, 230, 118, 0.3);
+        }
+        .btn-3d {
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateY(0);
+        }
+        .btn-3d:active {
+            transform: translateY(2px) scale(0.98);
+        }
+        .card-3d {
+            transform: perspective(1000px);
+            transition: transform 0.3s ease;
+        }
+        .card-3d:hover {
+            transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) scale(1.02);
+        }
+        .page-transition {
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .hidden { display: none !important; }
+        ::-webkit-scrollbar { width: 0px; }
+        .nav-active { color: var(--accent); }
+        .lang-toggle { position: relative; width: 44px; height: 24px; background: #333; border-radius: 12px; cursor: pointer; transition: 0.3s; }
+        .lang-toggle.on { background: var(--accent); }
+        .lang-toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: 0.3s; }
+        .lang-toggle.on::after { transform: translateX(20px); }
+    </style>
+</head>
+<body class="min-h-screen relative">
+
+    <!-- Ambient Background -->
+    <div class="fixed inset-0 z-0 pointer-events-none">
+        <div class="absolute top-0 left-0 w-72 h-72 bg-green-500/10 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+    </div>
+
+    <!-- ================= CONFIGURATION ================= -->
+    <script>
+        const firebaseConfig = {
+  apiKey: "AIzaSyAR5S14ZSG3qCzZvCN-24CQIi5z0bH5YfU",
+  authDomain: "talegram-bot-4ae42.firebaseapp.com",
+  databaseURL: "https://talegram-bot-4ae42-default-rtdb.firebaseio.com",
+  projectId: "talegram-bot-4ae42",
+  storageBucket: "talegram-bot-4ae42.firebasestorage.app",
+  messagingSenderId: "770346972621",
+  appId: "1:770346972621:web:8dee825451641de49d0084"
+};
+        const TELEGRAM_BOT_TOKEN = "8951431648:AAFBo54eOViB70Pk1kOaPFbzMK_fQA_sxik"; // Needed for secure validation if backend existed
+    </script>
+
+    <!-- ================= FIREBASE & TELEGRAM SDK ================= -->
+    <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-database-compat.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <div id="app-container" class="relative z-10 min-h-screen flex flex-col">
+
+        <!-- ================= AUTH SCREEN ================= -->
+        <div id="auth-screen" class="flex-1 flex flex-col items-center justify-center p-6">
+            <div class="glass p-8 rounded-3xl w-full max-w-md text-center card-3d">
+                <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-green-400 to-blue-500 flex items-center justify-center glow-accent">
+                    <i data-lucide="wallet" class="w-10 h-10 text-white"></i>
+                </div>
+                <h1 class="text-3xl font-bold mb-2">Income App</h1>
+                <p class="text-gray-400 mb-8">Premium Rewards & Earning Platform</p>
+                
+                <button onclick="loginWithGoogle()" class="btn-3d w-full mb-4 py-3 rounded-xl bg-white text-black font-semibold flex items-center justify-center gap-2">
+                    <i data-lucide="chrome"></i> Continue with Google
+                </button>
+                
+                <div class="flex items-center gap-2 my-4 text-gray-500 text-xs">
+                    <div class="flex-1 h-px bg-gray-700"></div> OR <div class="flex-1 h-px bg-gray-700"></div>
+                </div>
+
+                <div class="space-y-3">
+                    <input type="email" id="login-email" placeholder="Email" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-green-500 outline-none">
+                    <input type="password" id="login-pass" placeholder="Password" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-green-500 outline-none">
+                    <button onclick="loginManual()" class="btn-3d w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-blue-500 font-semibold">Login</button>
+                    <button onclick="showRegister()" class="text-sm text-gray-400 hover:text-white">Create Account</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= USER APP ================= -->
+        <div id="user-app" class="hidden flex-1 flex flex-col pb-20 md:pb-0">
+            <!-- Top Nav -->
+            <header class="glass sticky top-0 z-40 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="showPage('home')">
+                    <img id="user-avatar" src="https://via.placeholder.com/40" class="w-10 h-10 rounded-full border border-white/20">
+                    <div>
+                        <h2 id="user-name" class="font-semibold text-sm">Loading...</h2>
+                        <p id="user-balance" class="text-xs text-green-400">৳ 0.00</p>
+                    </div>
+                </div>
+                <button class="relative p-2 rounded-lg hover:bg-white/10">
+                    <i data-lucide="bell"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+            </header>
+
+            <!-- Content Area -->
+            <main id="user-content" class="flex-1 p-4 overflow-y-auto"></main>
+
+            <!-- Bottom Nav -->
+            <nav class="glass fixed bottom-0 left-0 right-0 z-40 flex justify-around items-center py-2 md:hidden">
+                <button onclick="showPage('perks')" class="flex flex-col items-center text-gray-400 hover:text-green-400 p-2">
+                    <i data-lucide="gift"></i><span class="text-xs">Perks</span>
+                </button>
+                <button onclick="showPage('play')" class="flex flex-col items-center text-gray-400 hover:text-green-400 p-2">
+                    <i data-lucide="gamepad-2"></i><span class="text-xs">Play</span>
+                </button>
+                <button onclick="showPage('home')" class="flex flex-col items-center text-green-400 p-2 -mt-6 bg-slate-800 rounded-full w-16 h-16 border-4 border-slate-900">
+                    <i data-lucide="home"></i>
+                </button>
+                <button onclick="showPage('arena')" class="flex flex-col items-center text-gray-400 hover:text-green-400 p-2">
+                    <i data-lucide="trophy"></i><span class="text-xs">Arena</span>
+                </button>
+                <button onclick="showPage('explore')" class="flex flex-col items-center text-gray-400 hover:text-green-400 p-2">
+                    <i data-lucide="compass"></i><span class="text-xs">Explore</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- ================= ADMIN APP ================= -->
+        <div id="admin-app" class="hidden flex-1 flex flex-col">
+            <!-- Admin Top Nav -->
+            <header class="glass sticky top-0 z-40 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleAdminDrawer()"><i data-lucide="menu"></i></button>
+                    <h2 class="font-bold">Admin Panel</h2>
+                </div>
+                <button class="relative p-2 rounded-lg hover:bg-white/10">
+                    <i data-lucide="bell"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+            </header>
+
+            <div class="flex flex-1">
+                <!-- Admin Side Drawer -->
+                <aside id="admin-drawer" class="glass fixed left-0 top-0 bottom-0 w-64 p-4 z-50 transform -translate-x-full transition-transform md:relative md:translate-x-0 md:flex flex-col gap-2">
+                    <button onclick="showAdminPage('dashboard')" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 w-full"><i data-lucide="layout-dashboard"></i> Dashboard</button>
+                    <button onclick="toggleDropdown('admin-users')" class="flex items-center justify-between p-3 rounded-xl hover:bg-white/10 w-full"><span class="flex items-center gap-3"><i data-lucide="users"></i> Users</span> <i data-lucide="chevron-down"></i></button>
+                    <div id="admin-users" class="hidden pl-8 space-y-2">
+                        <button onclick="showAdminPage('all-users')" class="block text-sm text-gray-400 hover:text-white">All Users</button>
+                        <button onclick="showAdminPage('banned-users')" class="block text-sm text-gray-400 hover:text-white">Banned Users</button>
+                    </div>
+                    <button onclick="toggleDropdown('admin-finance')" class="flex items-center justify-between p-3 rounded-xl hover:bg-white/10 w-full"><span class="flex items-center gap-3"><i data-lucide="credit-card"></i> Finance</span> <i data-lucide="chevron-down"></i></button>
+                    <div id="admin-finance" class="hidden pl-8 space-y-2">
+                        <button onclick="showAdminPage('withdrawals')" class="block text-sm text-gray-400 hover:text-white">Withdrawals</button>
+                        <button onclick="showAdminPage('transactions')" class="block text-sm text-gray-400 hover:text-white">Transactions</button>
+                    </div>
+                    <button onclick="logout()" class="mt-auto flex items-center gap-3 p-3 rounded-xl bg-red-500/20 text-red-400 w-full"><i data-lucide="log-out"></i> Logout</button>
+                </aside>
+
+                <!-- Admin Content Area -->
+                <main id="admin-content" class="flex-1 p-6 overflow-y-auto bg-transparent"></main>
+            </div>
+        </div>
+
+        <!-- ================= MODALS & TOASTS ================= -->
+        <div id="modal-container" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div id="modal-box" class="glass p-6 rounded-2xl w-full max-w-md relative">
+                <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-400"><i data-lucide="x"></i></button>
+                <div id="modal-content"></div>
+            </div>
+        </div>
+
+        <div id="toast-container" class="fixed top-4 right-4 z-[200] space-y-2"></div>
+    </div>
+
+    <script>
+        // ========================================================
+        // GLOBAL STATE & CONFIG
+        // ========================================================
+        let currentUser = null;
+        let currentUserData = null;
+        let currentLang = 'en';
+        
+        const translations = {
+            en: { home: "Home", wallet: "Wallet", tasks: "Tasks", profile: "Profile", balance: "Balance" },
+            bn: { home: "হোম", wallet: "ওয়ালেট", tasks: "টাস্ক", profile: "প্রোফাইল", balance: "ব্যালেন্স" }
+            // Add other 18 languages here
+        };
+
+        // ========================================================
+        // FIREBASE INIT
+        // ========================================================
+        firebase.initializeApp(FIREBASE_CONFIG);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        // Telegram SDK Init
+        if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        }
+
+        // ========================================================
+        // AUTHENTICATION LOGIC
+        // ========================================================
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                const userRef = db.ref('users/' + user.uid);
+                const snap = await userRef.get();
+                
+                if (!snap.exists()) {
+                    // Create New User Profile
+                    const newUserData = {
+                        uid: user.uid,
+                        email: user.email || "",
+                        name: user.displayName || "User",
+                        photoURL: user.photoURL || "https://via.placeholder.com/150",
+                        balance: 0,
+                        coins: 0,
+                        referralCode: generateRefCode(),
+                        joinDate: Date.now(),
+                        accountStatus: "active",
+                        language: "en"
+                    };
+                    await userRef.set(newUserData);
+                    currentUserData = newUserData;
+                } else {
+                    currentUserData = snap.val();
+                }
+
+                // Check Admin Status
+                const adminSnap = await db.ref('admin/admins/' + user.uid).get();
+                if (adminSnap.exists() && adminSnap.val().enabled) {
+                    showApp('admin');
+                    showAdminPage('dashboard');
+                } else {
+                    showApp('user');
+                    showPage('home');
+                }
+            } else {
+                currentUser = null;
+                currentUserData = null;
+                showApp('auth');
+            }
+        });
+
+        function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(err => showToast(err.message, "error"));
+        }
+
+        function loginManual() {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            auth.signInWithEmailAndPassword(email, pass).catch(err => showToast(err.message, "error"));
+        }
+
+        function showRegister() {
+            // Simplified registration modal for brevity
+            openModal(`
+                <h3 class="text-xl font-bold mb-4">Create Account</h3>
+                <input id="reg-name" type="text" placeholder="Full Name" class="w-full px-4 py-3 mb-3 rounded-xl bg-white/5 border border-white/10 outline-none">
+                <input id="reg-email" type="email" placeholder="Email" class="w-full px-4 py-3 mb-3 rounded-xl bg-white/5 border border-white/10 outline-none">
+                <input id="reg-pass" type="password" placeholder="Password" class="w-full px-4 py-3 mb-3 rounded-xl bg-white/5 border border-white/10 outline-none">
+                <input id="reg-ref" type="text" placeholder="Referral Code (Optional)" class="w-full px-4 py-3 mb-3 rounded-xl bg-white/5 border border-white/10 outline-none">
+                <button onclick="registerManual()" class="btn-3d w-full py-3 rounded-xl bg-green-500 font-semibold">Register</button>
+            `);
+        }
+
+        function registerManual() {
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-pass').value;
+            const ref = document.getElementById('reg-ref').value;
+            
+            auth.createUserWithEmailAndPassword(email, pass)
+                .then(cred => {
+                    return cred.user.updateProfile({ displayName: name });
+                })
+                .catch(err => showToast(err.message, "error"));
+        }
+
+        function logout() {
+            auth.signOut();
+        }
+
+        // ========================================================
+        // NAVIGATION & UI
+        // ========================================================
+        function showApp(appName) {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('user-app').classList.add('hidden');
+            document.getElementById('admin-app').classList.add('hidden');
+            document.getElementById(appName).classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function showPage(pageId) {
+            const content = document.getElementById('user-content');
+            content.classList.add('page-transition');
+            setTimeout(() => content.classList.remove('page-transition'), 400);
+
+            // Update Header
+            if (currentUserData) {
+                document.getElementById('user-name').innerText = currentUserData.name;
+                document.getElementById('user-balance').innerText = `৳ ${currentUserData.balance.toFixed(2)}`;
+                document.getElementById('user-avatar').src = currentUserData.photoURL;
+            }
+
+            // Route Mapping
+            const routes = {
+                home: renderHome,
+                perks: renderPerks,
+                play: renderPlay,
+                arena: renderArena,
+                explore: renderExplore,
+                profile: renderProfile,
+                wallet: renderWallet,
+                withdraw: renderWithdraw,
+                tasks: renderTasks
+            };
+            
+            content.innerHTML = routes[pageId] ? routes[pageId]() : "<h1>404 Not Found</h1>";
+            lucide.createIcons();
+        }
+
+        function showAdminPage(pageId) {
+            const content = document.getElementById('admin-content');
+            content.classList.add('page-transition');
+            setTimeout(() => content.classList.remove('page-transition'), 400);
+
+            const routes = {
+                dashboard: renderAdminDashboard,
+                'all-users': renderAdminUsers,
+                withdrawals: renderAdminWithdrawals
+            };
+            
+            content.innerHTML = routes[pageId] ? routes[pageId]() : "<h1>Select an option</h1>";
+            lucide.createIcons();
+        }
+
+        function toggleDropdown(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        }
+
+        function toggleAdminDrawer() {
+            const drawer = document.getElementById('admin-drawer');
+            drawer.classList.toggle('-translate-x-full');
+            drawer.classList.toggle('translate-x-0');
+        }
+
+        // ========================================================
+        // USER APP PAGES
+        // ========================================================
+        function renderHome() {
+            return `
+                <div class="space-y-4">
+                    <div class="glass p-6 rounded-2xl card-3d">
+                        <p class="text-gray-400 text-sm">Total Balance</p>
+                        <h1 class="text-4xl font-bold text-green-400 my-2">৳ ${currentUserData ? currentUserData.balance.toFixed(2) : '0.00'}</h1>
+                        <div class="flex gap-2 mt-4">
+                            <button onclick="showPage('withdraw')" class="btn-3d flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/20">Withdraw</button>
+                            <button onclick="showPage('tasks')" class="btn-3d flex-1 py-3 rounded-xl bg-green-500 text-black font-semibold">Earn</button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="glass p-4 rounded-2xl flex flex-col items-center card-3d">
+                            <i data-lucide="zap" class="text-yellow-400 mb-2"></i>
+                            <p class="text-2xl font-bold">${currentUserData ? currentUserData.coins : 0}</p>
+                            <p class="text-xs text-gray-400">Coins</p>
+                        </div>
+                        <div class="glass p-4 rounded-2xl flex flex-col items-center card-3d">
+                            <i data-lucide="users" class="text-blue-400 mb-2"></i>
+                            <p class="text-2xl font-bold">0</p>
+                            <p class="text-xs text-gray-400">Referrals</p>
+                        </div>
+                    </div>
+
+                    <div class="glass p-4 rounded-2xl">
+                        <h3 class="font-bold mb-3">Quick Tasks</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between p-3 bg-white/5 rounded-xl">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="check-circle" class="text-green-400"></i>
+                                    <span>Daily Check-in</span>
+                                </div>
+                                <span class="text-green-400 text-sm">+ ৳ 5.00</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-white/5 rounded-xl">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="play-circle" class="text-blue-400"></i>
+                                    <span>Watch Ads</span>
+                                </div>
+                                <span class="text-green-400 text-sm">+ ৳ 2.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderProfile() {
+            return `
+                <div class="glass p-6 rounded-2xl text-center mb-4">
+                    <img src="${currentUserData ? currentUserData.photoURL : ''}" class="w-24 h-24 mx-auto rounded-full border-4 border-white/10 mb-3">
+                    <h2 class="text-xl font-bold">${currentUserData ? currentUserData.name : 'User'}</h2>
+                    <p class="text-gray-400 text-sm">${currentUserData ? currentUserData.email : 'N/A'}</p>
+                    <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                        <div class="bg-white/5 p-2 rounded-lg"><span class="block font-bold text-base">${currentUserData ? currentUserData.referralCode : 'N/A'}</span>Ref Code</div>
+                        <div class="bg-white/5 p-2 rounded-lg"><span class="block font-bold text-base">Active</span>Status</div>
+                        <div class="bg-white/5 p-2 rounded-lg"><span class="block font-bold text-base">৳ ${currentUserData ? currentUserData.balance.toFixed(2) : '0'}</span>Balance</div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <!-- Earning & Wallet -->
+                    <div class="glass rounded-2xl overflow-hidden">
+                        <button onclick="toggleDropdown('dd-wallet')" class="w-full p-4 flex justify-between items-center hover:bg-white/5">
+                            <span class="flex items-center gap-3 font-semibold"><i data-lucide="wallet"></i> Earning & Wallet</span>
+                            <i data-lucide="chevron-down"></i>
+                        </button>
+                        <div id="dd-wallet" class="hidden border-t border-white/5">
+                            <button onclick="showPage('wallet')" class="w-full p-3 text-left text-sm pl-8 hover:bg-white/5">My Wallet</button>
+                            <button onclick="showPage('withdraw')" class="w-full p-3 text-left text-sm pl-8 hover:bg-white/5">Withdraw</button>
+                            <button onclick="showPage('history')" class="w-full p-3 text-left text-sm pl-8 hover:bg-white/5">Transaction History</button>
+                        </div>
+                    </div>
+
+                    <!-- My Tasks -->
+                    <div class="glass rounded-2xl overflow-hidden">
+                        <button onclick="toggleDropdown('dd-tasks')" class="w-full p-4 flex justify-between items-center hover:bg-white/5">
+                            <span class="flex items-center gap-3 font-semibold"><i data-lucide="list-checks"></i> My Tasks</span>
+                            <i data-lucide="chevron-down"></i>
+                        </button>
+                        <div id="dd-tasks" class="hidden border-t border-white/5">
+                            <button onclick="showPage('checkin')" class="w-full p-3 text-left text-sm pl-8 hover:bg-white/5">Daily Check-in</button>
+                            <button onclick="showPage('ads')" class="w-full p-3 text-left text-sm pl-8 hover:bg-white/5">Watch Ads</button>
+                            <button onclick="showPage('ref')" class="w-full p-3 text-left text-sm pl-8 hover:bg-white/5">Refer & Earn</button>
+                        </div>
+                    </div>
+
+                    <!-- Language -->
+                    <div class="glass rounded-2xl overflow-hidden">
+                        <button onclick="toggleDropdown('dd-lang')" class="w-full p-4 flex justify-between items-center hover:bg-white/5">
+                            <span class="flex items-center gap-3 font-semibold"><i data-lucide="globe"></i> Language</span>
+                            <i data-lucide="chevron-down"></i>
+                        </button>
+                        <div id="dd-lang" class="hidden border-t border-white/5 p-3 space-y-3">
+                            <div class="flex justify-between items-center text-sm">
+                                <span>English</span>
+                                <div class="lang-toggle on" onclick="toggleLang(this)"></div>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span>বাংলা</span>
+                                <div class="lang-toggle" onclick="toggleLang(this)"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Admin Panel Button (Conditional) -->
+                    <button onclick="showAdminPage('dashboard'); showApp('admin')" class="hidden w-full p-4 rounded-2xl bg-yellow-500/20 text-yellow-400 font-bold flex items-center justify-center gap-2">
+                        <i data-lucide="crown"></i> Admin Panel
+                    </button>
+
+                    <button onclick="logout()" class="w-full p-4 rounded-2xl bg-red-500/20 text-red-400 font-semibold flex items-center justify-center gap-2">
+                        <i data-lucide="log-out"></i> Logout
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderPerks() { return `<div class="glass p-6 rounded-2xl text-center"><h2 class="text-xl">Daily Perks & Bonuses</h2></div>`; }
+        function renderPlay() { return `<div class="glass p-6 rounded-2xl text-center"><h2 class="text-xl">Play & Win</h2></div>`; }
+        function renderArena() { return `<div class="glass p-6 rounded-2xl text-center"><h2 class="text-xl">The Arena</h2></div>`; }
+        function renderExplore() { return `<div class="glass p-6 rounded-2xl text-center"><h2 class="text-xl">Explore New Features</h2></div>`; }
+        function renderWallet() { return `<div class="glass p-6 rounded-2xl"><h2 class="text-xl mb-4">My Wallet</h2><p>Balance: ৳ ${currentUserData ? currentUserData.balance.toFixed(2) : '0'}</p></div>`; }
+        function renderWithdraw() { return `<div class="glass p-6 rounded-2xl"><h2 class="text-xl mb-4">Withdraw Funds</h2><input placeholder="Amount" class="w-full p-3 rounded-xl bg-white/5 mb-2"><input placeholder="bKash Number" class="w-full p-3 rounded-xl bg-white/5 mb-2"><button class="w-full p-3 rounded-xl bg-green-500 font-bold">Request</button></div>`; }
+        function renderTasks() { return `<div class="glass p-6 rounded-2xl"><h2 class="text-xl mb-4">Available Tasks</h2></div>`; }
+
+
+        // ========================================================
+        // ADMIN APP PAGES
+        // ========================================================
+        function renderAdminDashboard() {
+            return `
+                <div class="space-y-6">
+                    <h1 class="text-2xl font-bold">System Dashboard</h1>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="glass p-4 rounded-2xl card-3d">
+                            <p class="text-gray-400 text-sm">Total Users</p>
+                            <h2 class="text-3xl font-bold text-blue-400">1,204</h2>
+                        </div>
+                        <div class="glass p-4 rounded-2xl card-3d">
+                            <p class="text-gray-400 text-sm">Total Balance</p>
+                            <h2 class="text-3xl font-bold text-green-400">৳ 45.2k</h2>
+                        </div>
+                        <div class="glass p-4 rounded-2xl card-3d">
+                            <p class="text-gray-400 text-sm">Pending Withdrawals</p>
+                            <h2 class="text-3xl font-bold text-yellow-400">12</h2>
+                        </div>
+                        <div class="glass p-4 rounded-2xl card-3d">
+                            <p class="text-gray-400 text-sm">Active Users</p>
+                            <h2 class="text-3xl font-bold text-purple-400">560</h2>
+                        </div>
+                    </div>
+                    <div class="glass p-6 rounded-2xl">
+                        <h3 class="font-bold mb-4">User Growth (Mockup)</h3>
+                        <div class="h-40 bg-gradient-to-t from-green-500/20 to-transparent rounded-xl flex items-end gap-2">
+                            <div class="w-1/4 h-1/2 bg-green-500 rounded-t-md"></div>
+                            <div class="w-1/4 h-3/4 bg-green-500 rounded-t-md"></div>
+                            <div class="w-1/4 h-full bg-green-500 rounded-t-md"></div>
+                        </div>
+                    </div>
+                    <div class="glass p-4 rounded-2xl text-center text-gray-400 text-sm">
+                        <i data-lucide="info" class="inline-block mr-2"></i> This dashboard is strictly for viewing statistics. No action buttons allowed.
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAdminUsers() {
+            return `<div class="glass p-6 rounded-2xl"><h2 class="text-xl mb-4">All Users</h2><p>User list goes here...</p></div>`;
+        }
+
+        function renderAdminWithdrawals() {
+            return `<div class="glass p-6 rounded-2xl"><h2 class="text-xl mb-4">Pending Withdrawals</h2><p>Withdrawal list goes here...</p></div>`;
+        }
+
+        // ========================================================
+        // UTILITIES
+        // ========================================================
+        function openModal(html) {
+            document.getElementById('modal-content').innerHTML = html;
+            document.getElementById('modal-container').classList.remove('hidden');
+            lucide.createIcons();
+        }
+        function closeModal() {
+            document.getElementById('modal-container').classList.add('hidden');
+        }
+        function showToast(msg, type="success") {
+            const t = document.createElement('div');
+            t.className = `glass px-4 py-3 rounded-xl flex items-center gap-2 ${type === 'success' ? 'border-green-500' : 'border-red-500'}`;
+            t.innerHTML = `<span>${msg}</span>`;
+            document.getElementById('toast-container').appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+        function toggleLang(el) {
+            document.querySelectorAll('.lang-toggle').forEach(t => t.classList.remove('on'));
+            el.classList.add('on');
+        }
+        function generateRefCode() {
+            return 'REF' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        }
+
+        // Init Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
