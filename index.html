@@ -63,6 +63,15 @@
         .lang-toggle.on { background: var(--accent); }
         .lang-toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: 0.3s; }
         .lang-toggle.on::after { transform: translateX(20px); }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--accent);
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="min-h-screen relative">
@@ -84,39 +93,33 @@
   messagingSenderId: "770346972621",
   appId: "1:770346972621:web:8dee825451641de49d0084"
 };
-        const TELEGRAM_BOT_TOKEN = "8951431648:AAFBo54eOViB70Pk1kOaPFbzMK_fQA_sxik"; // Needed for secure validation if backend existed
+        };
     </script>
 
     <!-- ================= FIREBASE & TELEGRAM SDK ================= -->
     <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-database-compat.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <div id="app-container" class="relative z-10 min-h-screen flex flex-col">
 
-        <!-- ================= AUTH SCREEN ================= -->
+        <!-- ================= AUTH SCREEN (Telegram Auto Only) ================= -->
         <div id="auth-screen" class="flex-1 flex flex-col items-center justify-center p-6">
             <div class="glass p-8 rounded-3xl w-full max-w-md text-center card-3d">
-                <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-green-400 to-blue-500 flex items-center justify-center glow-accent">
-                    <i data-lucide="wallet" class="w-10 h-10 text-white"></i>
+                <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-blue-400 to-blue-500 flex items-center justify-center glow-accent">
+                    <i data-lucide="send" class="w-10 h-10 text-white"></i>
                 </div>
                 <h1 class="text-3xl font-bold mb-2">Income App</h1>
                 <p class="text-gray-400 mb-8">Premium Rewards & Earning Platform</p>
                 
-                <button onclick="loginWithGoogle()" class="btn-3d w-full mb-4 py-3 rounded-xl bg-white text-black font-semibold flex items-center justify-center gap-2">
-                    <i data-lucide="chrome"></i> Continue with Google
-                </button>
-                
-                <div class="flex items-center gap-2 my-4 text-gray-500 text-xs">
-                    <div class="flex-1 h-px bg-gray-700"></div> OR <div class="flex-1 h-px bg-gray-700"></div>
+                <div id="auth-loader" class="flex flex-col items-center justify-center py-8">
+                    <div class="spinner mb-4"></div>
+                    <p class="text-gray-400">Waiting for Telegram Authentication...</p>
                 </div>
-
-                <div class="space-y-3">
-                    <input type="email" id="login-email" placeholder="Email" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-green-500 outline-none">
-                    <input type="password" id="login-pass" placeholder="Password" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-green-500 outline-none">
-                    <button onclick="loginManual()" class="btn-3d w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-blue-500 font-semibold">Login</button>
-                    <button onclick="showRegister()" class="text-sm text-gray-400 hover:text-white">Create Account</button>
+                
+                <div id="auth-error" class="hidden text-red-400 py-8">
+                    <i data-lucide="alert-circle" class="w-10 h-10 mx-auto mb-3"></i>
+                    <p>Please open this app inside the Telegram Mini App.</p>
                 </div>
             </div>
         </div>
@@ -212,21 +215,17 @@
         // ========================================================
         // GLOBAL STATE & CONFIG
         // ========================================================
-        let currentUser = null;
         let currentUserData = null;
-        let currentLang = 'en';
         
         const translations = {
             en: { home: "Home", wallet: "Wallet", tasks: "Tasks", profile: "Profile", balance: "Balance" },
             bn: { home: "হোম", wallet: "ওয়ালেট", tasks: "টাস্ক", profile: "প্রোফাইল", balance: "ব্যালেন্স" }
-            // Add other 18 languages here
         };
 
         // ========================================================
         // FIREBASE INIT
         // ========================================================
         firebase.initializeApp(FIREBASE_CONFIG);
-        const auth = firebase.auth();
         const db = firebase.database();
 
         // Telegram SDK Init
@@ -236,88 +235,67 @@
         }
 
         // ========================================================
-        // AUTHENTICATION LOGIC
+        // TELEGRAM AUTO-AUTHENTICATION LOGIC
         // ========================================================
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                currentUser = user;
-                const userRef = db.ref('users/' + user.uid);
-                const snap = await userRef.get();
+        async function initTelegramAuth() {
+            if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                const tgUser = Telegram.WebApp.initDataUnsafe.user;
+                const userRef = db.ref('users/' + tgUser.id);
                 
-                if (!snap.exists()) {
-                    // Create New User Profile
-                    const newUserData = {
-                        uid: user.uid,
-                        email: user.email || "",
-                        name: user.displayName || "User",
-                        photoURL: user.photoURL || "https://via.placeholder.com/150",
-                        balance: 0,
-                        coins: 0,
-                        referralCode: generateRefCode(),
-                        joinDate: Date.now(),
-                        accountStatus: "active",
-                        language: "en"
-                    };
-                    await userRef.set(newUserData);
-                    currentUserData = newUserData;
-                } else {
-                    currentUserData = snap.val();
-                }
+                try {
+                    const snap = await userRef.get();
+                    
+                    if (!snap.exists()) {
+                        // Create New User Profile from Telegram Data
+                        const newUserData = {
+                            telegramId: tgUser.id,
+                            firstName: tgUser.first_name || "User",
+                            lastName: tgUser.last_name || "",
+                            username: tgUser.username || "",
+                            photoURL: tgUser.photo_url || "https://via.placeholder.com/150",
+                            authMethod: "telegram",
+                            balance: 0,
+                            coins: 0,
+                            referralCode: generateRefCode(),
+                            referredBy: Telegram.WebApp.initDataUnsafe.start_param || "",
+                            joinDate: Date.now(),
+                            lastLogin: Date.now(),
+                            accountStatus: "active",
+                            language: "en"
+                        };
+                        await userRef.set(newUserData);
+                        currentUserData = newUserData;
+                    } else {
+                        currentUserData = snap.val();
+                        // Update last login
+                        await userRef.update({ lastLogin: Date.now() });
+                    }
 
-                // Check Admin Status
-                const adminSnap = await db.ref('admin/admins/' + user.uid).get();
-                if (adminSnap.exists() && adminSnap.val().enabled) {
-                    showApp('admin');
-                    showAdminPage('dashboard');
-                } else {
-                    showApp('user');
-                    showPage('home');
+                    // Check Admin Status
+                    const adminSnap = await db.ref('admin/admins/' + tgUser.id).get();
+                    if (adminSnap.exists() && adminSnap.val().enabled) {
+                        showApp('admin');
+                        showAdminPage('dashboard');
+                    } else {
+                        showApp('user');
+                        showPage('home');
+                    }
+                } catch (error) {
+                    showToast(error.message, "error");
                 }
             } else {
-                currentUser = null;
-                currentUserData = null;
-                showApp('auth');
+                // Not opened inside Telegram
+                document.getElementById('auth-loader').classList.add('hidden');
+                document.getElementById('auth-error').classList.remove('hidden');
             }
-        });
-
-        function loginWithGoogle() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(err => showToast(err.message, "error"));
-        }
-
-        function loginManual() {
-            const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-pass').value;
-            auth.signInWithEmailAndPassword(email, pass).catch(err => showToast(err.message, "error"));
-        }
-
-        function showRegister() {
-            // Simplified registration modal for brevity
-            openModal(`
-                <h3 class="text-xl font-bold mb-4">Create Account</h3>
-                <input id="reg-name" type="text" placeholder="Full Name" class="w-full px-4 py-3 mb-3 rounded-xl bg-white/5 border border-white/10 outline-none">
-                <input id="reg-email" type="email" placeholder="Email" class="w-full px-4 py-3 mb-3 rounded-xl bg-white/5 border border-white/10 outline-none">
-                <input id="reg-pass" type="password" placeholder="Password" class="w-full px-4 py-3 mb-3 rounded-xl bg-white/5 border border-white/10 outline-none">
-                <input id="reg-ref" type="text" placeholder="Referral Code (Optional)" class="w-full px-4 py-3 mb-3 rounded-xl bg-white/5 border border-white/10 outline-none">
-                <button onclick="registerManual()" class="btn-3d w-full py-3 rounded-xl bg-green-500 font-semibold">Register</button>
-            `);
-        }
-
-        function registerManual() {
-            const name = document.getElementById('reg-name').value;
-            const email = document.getElementById('reg-email').value;
-            const pass = document.getElementById('reg-pass').value;
-            const ref = document.getElementById('reg-ref').value;
-            
-            auth.createUserWithEmailAndPassword(email, pass)
-                .then(cred => {
-                    return cred.user.updateProfile({ displayName: name });
-                })
-                .catch(err => showToast(err.message, "error"));
         }
 
         function logout() {
-            auth.signOut();
+            // Mini Apps usually don't logout, but we can reset state
+            currentUserData = null;
+            showApp('auth');
+            document.getElementById('auth-loader').classList.remove('hidden');
+            document.getElementById('auth-error').classList.add('hidden');
         }
 
         // ========================================================
@@ -338,7 +316,7 @@
 
             // Update Header
             if (currentUserData) {
-                document.getElementById('user-name').innerText = currentUserData.name;
+                document.getElementById('user-name').innerText = currentUserData.firstName + " " + (currentUserData.lastName || "");
                 document.getElementById('user-balance').innerText = `৳ ${currentUserData.balance.toFixed(2)}`;
                 document.getElementById('user-avatar').src = currentUserData.photoURL;
             }
@@ -440,8 +418,8 @@
             return `
                 <div class="glass p-6 rounded-2xl text-center mb-4">
                     <img src="${currentUserData ? currentUserData.photoURL : ''}" class="w-24 h-24 mx-auto rounded-full border-4 border-white/10 mb-3">
-                    <h2 class="text-xl font-bold">${currentUserData ? currentUserData.name : 'User'}</h2>
-                    <p class="text-gray-400 text-sm">${currentUserData ? currentUserData.email : 'N/A'}</p>
+                    <h2 class="text-xl font-bold">${currentUserData ? currentUserData.firstName + ' ' + (currentUserData.lastName || '') : 'User'}</h2>
+                    <p class="text-gray-400 text-sm">@${currentUserData ? currentUserData.username : 'N/A'}</p>
                     <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
                         <div class="bg-white/5 p-2 rounded-lg"><span class="block font-bold text-base">${currentUserData ? currentUserData.referralCode : 'N/A'}</span>Ref Code</div>
                         <div class="bg-white/5 p-2 rounded-lg"><span class="block font-bold text-base">Active</span>Status</div>
@@ -513,7 +491,6 @@
         function renderWallet() { return `<div class="glass p-6 rounded-2xl"><h2 class="text-xl mb-4">My Wallet</h2><p>Balance: ৳ ${currentUserData ? currentUserData.balance.toFixed(2) : '0'}</p></div>`; }
         function renderWithdraw() { return `<div class="glass p-6 rounded-2xl"><h2 class="text-xl mb-4">Withdraw Funds</h2><input placeholder="Amount" class="w-full p-3 rounded-xl bg-white/5 mb-2"><input placeholder="bKash Number" class="w-full p-3 rounded-xl bg-white/5 mb-2"><button class="w-full p-3 rounded-xl bg-green-500 font-bold">Request</button></div>`; }
         function renderTasks() { return `<div class="glass p-6 rounded-2xl"><h2 class="text-xl mb-4">Available Tasks</h2></div>`; }
-
 
         // ========================================================
         // ADMIN APP PAGES
@@ -589,7 +566,11 @@
             return 'REF' + Math.random().toString(36).substr(2, 6).toUpperCase();
         }
 
-        // Init Icons
+        // ========================================================
+        // INITIALIZATION
+        // ========================================================
+        // Start authentication check on load
+        initTelegramAuth();
         lucide.createIcons();
     </script>
 </body>
